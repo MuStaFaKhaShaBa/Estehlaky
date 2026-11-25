@@ -86,7 +86,7 @@ jobs:
     timeout-minutes: 10
     environment: ${{ inputs.environment }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: efbundle-${{ inputs.environment }}
           path: bundle
@@ -108,7 +108,7 @@ jobs:
       name: ${{ inputs.environment }}
       url: ${{ vars.BASE_URL }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: publish-${{ inputs.environment }}
           path: publish
