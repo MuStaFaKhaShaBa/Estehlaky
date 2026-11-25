@@ -141,7 +141,7 @@ jobs:
           Write-Host "Settings written to $path"
 
       - name: Upload with Web Deploy
-        uses: rasmusbuchholdt/simply-web-deploy@2.1.0
+        uses: rasmusbuchholdt/simply-web-deploy@2.2.0
         with:
           website-name: ${{ secrets.WEBDEPLOY_SITE }}
           server-computer-name: ${{ secrets.WEBDEPLOY_SERVER }}
