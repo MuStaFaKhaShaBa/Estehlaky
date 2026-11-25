@@ -1,0 +1,130 @@
+[
+  {
+    "email": "admin@estehlaky.local",
+    "firstName": "System",
+    "lastName": "Admin",
+    "password": "Admin@Estehlaky2026!A9x",
+    "roles": [ "Admin", "User" ],
+    "developmentOnly": false
+  },
+  {
+    "email": "user1@estehlaky.local",
+    "firstName": "Ahmed",
+    "lastName": "Hassan",
+    "password": "User1@Estehlaky2026!B7m",
+    "roles": [ "User" ],
+    "developmentOnly": false
+  },
+  {
+    "email": "user2@estehlaky.local",
+    "firstName": "Mohamed",
+    "lastName": "Ali",
+    "password": "User2@Estehlaky2026!C4p",
+    "roles": [ "User" ],
+    "developmentOnly": false
+  },
+  {
+    "email": "user3@estehlaky.local",
+    "firstName": "Omar",
+    "lastName": "Ibrahim",
+    "password": "User3@Estehlaky2026!D8k",
+    "roles": [ "User" ],
+    "developmentOnly": false
+  },
+  {
+    "email": "user4@estehlaky.local",
+    "firstName": "Mahmoud",
+    "lastName": "Khaled",
+    "password": "User4@Estehlaky2026!E2n",
+    "roles": [ "User" ],
+    "developmentOnly": false
+  },
+  {
+    "email": "user5@estehlaky.local",
+    "firstName": "Youssef",
+    "lastName": "Mostafa",
+    "password": "User5@Estehlaky2026!F6q",
+    "roles": [ "User" ],
+    "developmentOnly": false
+  },
+  {
+    "email": "dataentry1@estehlaky.local",
+    "firstName": "Sara",
+    "lastName": "Ahmed",
+    "password": "DataEntry1@Estehlaky2026!G5r",
+    "roles": [ "DataEntry" ],
+    "developmentOnly": false
+  },
+  {
+    "email": "dataentry2@estehlaky.local",
+    "firstName": "Nour",
+    "lastName": "Mohamed",
+    "password": "DataEntry2@Estehlaky2026!H3w",
+    "roles": [ "DataEntry" ],
+    "developmentOnly": false
+  },
+  {
+    "email": "reviewer1@estehlaky.local",
+    "firstName": "Mariam",
+    "lastName": "Hassan",
+    "password": "Reviewer1@Estehlaky2026!J9t",
+    "roles": [ "Reviewer" ],
+    "developmentOnly": false
+  },
+  {
+    "email": "reviewer2@estehlaky.local",
+    "firstName": "Amr",
+    "lastName": "Mahmoud",
+    "password": "Reviewer2@Estehlaky2026!K4z",
+    "roles": [ "Reviewer" ],
+    "developmentOnly": false
+  },
+  {
+    "email": "supervisor1@estehlaky.local",
+    "firstName": "Hany",
+    "lastName": "Ibrahim",
+    "password": "Supervisor1@Estehlaky2026!L7v",
+    "roles": [ "Supervisor" ],
+    "developmentOnly": false
+  },
+  {
+    "email": "supervisor2@estehlaky.local",
+    "firstName": "Dina",
+    "lastName": "Khaled",
+    "password": "Supervisor2@Estehlaky2026!M2x",
+    "roles": [ "Supervisor" ],
+    "developmentOnly": false
+  },
+  {
+    "email": "manager1@estehlaky.local",
+    "firstName": "Tarek",
+    "lastName": "Ali",
+    "password": "Manager1@Estehlaky2026!N8b",
+    "roles": [ "Manager" ],
+    "developmentOnly": false
+  },
+  {
+    "email": "manager2@estehlaky.local",
+    "firstName": "Salma",
+    "lastName": "Mostafa",
+    "password": "Manager2@Estehlaky2026!P5c",
+    "roles": [ "Manager" ],
+    "developmentOnly": false
+  },
+  {
+    "email": "mostafa.khshaba30@gmail.com",
+    "firstName": "Mostafa",
+    "lastName": "Khshaba",
+    "password": "MostafaAdmin@Estehlaky2026!Q6d",
+    "roles": [ "Admin", "User" ],
+    "developmentOnly": true
+  },
+  {
+    "email": "demo@estehlaky.local",
+    "firstName": "Demo",
+    "lastName": "User",
+    "password": "Demo@Estehlaky2026!R3f",
+    "roles": [ "User" ],
+    "developmentOnly": true
+  }
+]

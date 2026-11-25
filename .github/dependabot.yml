@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directories:
+      - "/Estehlaky.API"
+      - "/Estehlaky.Application"
+      - "/Estehlaky.Domain"
+      - "/Estehlaky.Infrastructure"
+      - "/tests/Estehlaky.UnitTests"
+      - "/tests/Estehlaky.API.Tests"
+    schedule:
+      interval: weekly
+    groups:
+      microsoft:
+        patterns: ["Microsoft.*", "System.*"]
+      testing:
+        patterns: ["xunit*", "NSubstitute*", "coverlet*", "Testcontainers*"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

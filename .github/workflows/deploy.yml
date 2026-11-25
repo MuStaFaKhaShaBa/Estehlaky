@@ -1,0 +1,176 @@
+name: Deploy (reusable)
+
+# Called by staging.yml and production.yml. Steps: build -> apply EF migrations -> upload to MonsterASP -> smoke test.
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub environment that holds the secrets (staging or production)
+        type: string
+        required: true
+      aspnetcore_environment:
+        description: ASPNETCORE_ENVIRONMENT of the site (Staging or Production)
+        type: string
+        required: true
+      version:
+        description: Version stamped into the assemblies (a leading "v" is removed)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+
+jobs:
+  build:
+    name: Build package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Publish API
+        env:
+          RAW_VERSION: ${{ inputs.version }}
+        run: |
+          VERSION="${RAW_VERSION#v}"
+          dotnet publish Estehlaky.API/Estehlaky.API.csproj -c Release -o ./publish \
+            -p:EnvironmentName=${{ inputs.aspnetcore_environment }} \
+            -p:Version="$VERSION"
+
+          # Never ship the settings of another environment (they can contain development secrets).
+          find ./publish -maxdepth 1 -name 'appsettings.*.json' \
+            ! -name 'appsettings.${{ inputs.aspnetcore_environment }}.json' -print -delete
+
+      - name: Build EF migration bundle
+        env:
+          # The design-time factory needs some value; the real one is passed when the bundle runs.
+          ConnectionStrings__Default: Server=none;Database=none;TrustServerCertificate=True
+        run: |
+          dotnet tool install --global dotnet-ef --version "10.0.*"
+          dotnet ef migrations bundle \
+            --project Estehlaky.Infrastructure --startup-project Estehlaky.API \
+            --configuration Release --self-contained -r linux-x64 \
+            --output ./efbundle --force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: publish-${{ inputs.environment }}
+          path: publish
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: efbundle-${{ inputs.environment }}
+          path: efbundle
+          retention-days: 7
+
+  migrate:
+    name: Apply database migrations
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: efbundle-${{ inputs.environment }}
+          path: bundle
+
+      - name: Run migration bundle
+        env:
+          DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
+        run: |
+          if [ -z "$DB_CONNECTION_STRING" ]; then echo "::error::Secret DB_CONNECTION_STRING is not set for this environment."; exit 1; fi
+          chmod +x ./bundle/efbundle
+          ./bundle/efbundle --connection "$DB_CONNECTION_STRING"
+
+  deploy:
+    name: Deploy to MonsterASP
+    needs: migrate
+    runs-on: windows-latest   # Web Deploy (msdeploy) is a Windows tool
+    timeout-minutes: 20
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ vars.BASE_URL }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: publish-${{ inputs.environment }}
+          path: publish
+
+      - name: Write environment settings into the package
+        shell: pwsh
+        env:
+          DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
+          JWT_KEY: ${{ secrets.JWT_KEY }}
+          MEDIATR_LICENSE_KEY: ${{ secrets.MEDIATR_LICENSE_KEY }}
+        run: |
+          foreach ($name in 'DB_CONNECTION_STRING', 'JWT_KEY') {
+            if (-not [Environment]::GetEnvironmentVariable($name)) { throw "Secret $name is not set for this environment." }
+          }
+          if ($env:JWT_KEY.Length -lt 32) { throw "JWT_KEY must be at least 32 characters." }
+
+          $path = Join-Path 'publish' 'appsettings.${{ inputs.aspnetcore_environment }}.json'
+          $cfg = @{}
+          if (Test-Path $path) { $cfg = Get-Content $path -Raw | ConvertFrom-Json -AsHashtable }
+
+          foreach ($section in 'ConnectionStrings', 'Jwt', 'MediatR') {
+            if (-not $cfg.ContainsKey($section)) { $cfg[$section] = @{} }
+          }
+          $cfg.ConnectionStrings.Default = $env:DB_CONNECTION_STRING
+          $cfg.Jwt.Key = $env:JWT_KEY
+          if ($env:MEDIATR_LICENSE_KEY) { $cfg.MediatR.LicenseKey = $env:MEDIATR_LICENSE_KEY }
+
+          $cfg | ConvertTo-Json -Depth 20 | Set-Content -Path $path -Encoding utf8NoBOM
+          Get-Content $path -Raw | ConvertFrom-Json | Out-Null   # fails the step if the file is not valid JSON
+          Write-Host "Settings written to $path"
+
+      - name: Upload with Web Deploy
+        uses: rasmusbuchholdt/simply-web-deploy@2.1.0
+        with:
+          website-name: ${{ secrets.WEBDEPLOY_SITE }}
+          server-computer-name: ${{ secrets.WEBDEPLOY_SERVER }}
+          server-username: ${{ secrets.WEBDEPLOY_USERNAME }}
+          server-password: ${{ secrets.WEBDEPLOY_PASSWORD }}
+          source-path: '\publish\'
+
+      # A bogus login must answer 401 Auth.InvalidCredentials. That proves the site starts, the
+      # configuration is valid and the database is reachable (a 500 would mean one of them is not).
+      - name: Smoke test
+        shell: pwsh
+        env:
+          BASE_URL: ${{ vars.BASE_URL }}
+        run: |
+          if (-not $env:BASE_URL) { throw "Variable BASE_URL is not set for this environment." }
+          $url = ($env:BASE_URL.TrimEnd('/')) + '/api/v1/auth/login'
+          $body = '{"email":"smoke-test@invalid.local","password":"not-a-real-password"}'
+
+          for ($i = 1; $i -le 12; $i++) {
+            try {
+              $r = Invoke-WebRequest -Uri $url -Method Post -ContentType 'application/json' -Body $body -SkipHttpErrorCheck
+              if ($r.StatusCode -eq 401 -and $r.Content -match 'Auth\.InvalidCredentials') {
+                Write-Host "Smoke test passed (attempt $i)."
+                exit 0
+              }
+              Write-Host "Attempt $i : HTTP $($r.StatusCode)"
+            } catch {
+              Write-Host "Attempt $i failed: $($_.Exception.Message)"
+            }
+            Start-Sleep -Seconds 15   # the first request after an upload can be slow (cold start)
+          }
+          throw "Smoke test failed: $url did not answer as expected."

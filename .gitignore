@@ -1,0 +1,27 @@
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+
+# Build output
+bin/
+obj/
+publish/
+efbundle*
+
+# Tests
+TestResults/
+coverage/
+*.trx
+
+# Local-only configuration and secrets
+appsettings.*.local.json
+secrets.json
+.env
+*.pfx
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db

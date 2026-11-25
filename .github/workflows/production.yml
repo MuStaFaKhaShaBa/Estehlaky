@@ -1,0 +1,61 @@
+name: Deploy Production
+
+# Releasing = pushing a version tag on a commit that is already on main:
+#   git tag v1.0.0 && git push origin v1.0.0
+# The "production" environment can require a manual approval before the deploy job starts.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify-tag:
+    name: Tag is on main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check that the tagged commit is reachable from main
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Tag $GITHUB_REF_NAME is not on main. Merge to main first, then tag."
+            exit 1
+          fi
+
+  ci:
+    needs: verify-tag
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: ci
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: production
+      aspnetcore_environment: Production
+      version: ${{ github.ref_name }}
+    secrets: inherit
+
+  release:
+    name: GitHub release
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create release with generated notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          FLAGS=""
+          case "$GITHUB_REF_NAME" in *-*) FLAGS="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" --generate-notes $FLAGS

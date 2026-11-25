@@ -1,0 +1,27 @@
+name: Deploy Staging
+
+# Every merge to main is tested and deployed to staging.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false   # never interrupt a running deployment
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: ci
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: staging
+      aspnetcore_environment: Staging
+      version: 0.0.${{ github.run_number }}-staging
+    secrets: inherit

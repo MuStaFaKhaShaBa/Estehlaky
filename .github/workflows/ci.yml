@@ -1,0 +1,117 @@
+name: CI
+
+# Runs on every pull request to main, and is reused (workflow_call) by the staging and production
+# workflows so that nothing is deployed without passing the same checks.
+on:
+  pull_request:
+    branches: [main]
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  SOLUTION: Estehlaky.slnx
+
+jobs:
+  build-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore "$SOLUTION"
+
+      - name: Build
+        run: dotnet build "$SOLUTION" -c Release --no-restore
+
+      - name: Unit tests
+        run: dotnet test --project tests/Estehlaky.UnitTests -c Release --no-build
+
+      # API tests are switched off for now. To turn them back on, uncomment this step AND add back the
+      # `services: sqlserver` block (see docs/CI-CD.md), then make "Build and test" required again.
+      # # Creates a temporary database on the SQL Server service container above, applies the EF migrations
+      # # and runs the real API against it.
+      # - name: API tests (real SQL Server)
+      #   env:
+      #     ESTEHLAKY_TEST_SQL: Server=localhost,1433;User Id=sa;Password=CiPassw0rd_Strong123;TrustServerCertificate=True
+      #   run: dotnet test --project tests/Estehlaky.API.Tests -c Release --no-build
+
+  # Fails when someone changes an entity or configuration but forgets `dotnet ef migrations add`.
+  migrations:
+    name: EF model matches migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Only the design-time factory needs a value here; the command does not connect to a database.
+      ConnectionStrings__Default: Server=localhost;Database=ci;User Id=sa;Password=unused;TrustServerCertificate=True
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install dotnet-ef
+        run: dotnet tool install --global dotnet-ef --version "10.0.*"
+
+      - name: Check for pending model changes
+        run: >
+          dotnet ef migrations has-pending-model-changes
+          --project Estehlaky.Infrastructure
+          --startup-project Estehlaky.API
+
+  # Informational: reports known-vulnerable NuGet packages without blocking the pull request.
+  packages:
+    name: Vulnerable packages (report)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Scan
+        run: |
+          dotnet restore "$SOLUTION"
+          dotnet list "$SOLUTION" package --vulnerable --include-transitive 2>&1 | tee vulnerable.txt
+          if grep -q "has the following vulnerable packages" vulnerable.txt; then
+            echo "::warning::Vulnerable NuGet packages found. See the log of this job."
+            exit 1
+          fi
+
+  # One stable name to mark as "required" in the branch protection rule.
+  ci-result:
+    name: CI result
+    if: always()
+    needs: [build-test, migrations, packages]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if a required job failed
+        run: |
+          if [ "${{ needs.build-test.result }}" != "success" ] || [ "${{ needs.migrations.result }}" != "success" ]; then
+            echo "A required CI job did not succeed."
+            exit 1
+          fi

@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/tests/">
+    <Project Path="tests/Estehlaky.API.Tests/Estehlaky.API.Tests.csproj" />
+    <Project Path="tests/Estehlaky.UnitTests/Estehlaky.UnitTests.csproj" />
+  </Folder>
+  <Project Path="Estehlaky.API/Estehlaky.API.csproj" />
+  <Project Path="Estehlaky.Application/Estehlaky.Application.csproj" />
+  <Project Path="Estehlaky.Domain/Estehlaky.Domain.csproj" />
+  <Project Path="Estehlaky.Infrastructure/Estehlaky.Infrastructure.csproj" />
+</Solution>
